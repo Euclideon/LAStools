@@ -56,7 +56,12 @@
   #endif
 typedef unordered_map<I32,U32> my_cell_hash;
 #else
+#ifdef _WIN32
 #include <hash_map>
+#else
+#include <ext/hash_map>
+using __gnu_cxx::hash_map;
+#endif
 using namespace std;
 typedef hash_map<I32,U32> my_cell_hash;
 #endif
