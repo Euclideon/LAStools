@@ -69,6 +69,11 @@ typedef short              laszip_I16;
 typedef int                laszip_I32;
 typedef __int64            laszip_I64;
 typedef char               laszip_CHAR;
+
+#ifdef _WIN32
+typedef wchar_t            laszip_WCHAR;
+#endif // _WIN32
+
 typedef float              laszip_F32;
 typedef double             laszip_F64;
 typedef void*              laszip_POINTER;
@@ -380,6 +385,16 @@ laszip_exploit_spatial_index(
     laszip_POINTER                     pointer
     , const laszip_BOOL                exploit
 );
+
+#ifdef _WIN32
+/*---------------------------------------------------------------------------*/
+LASZIP_API laszip_I32
+laszip_wopen_reader(
+laszip_POINTER                     pointer
+, const laszip_WCHAR*              file_name
+, laszip_BOOL*                     is_compressed
+);
+#endif // _WIN32
 
 /*---------------------------------------------------------------------------*/
 LASZIP_API laszip_I32

@@ -284,6 +284,50 @@ BOOL LASindex::has_intervals()
   return FALSE;
 }
 
+#ifdef _WIN32
+BOOL LASindex::read(const wchar_t* file_name)
+{
+  if (file_name == 0) return FALSE;
+  wchar_t* name = _wcsdup(file_name);
+  if (wcsstr(file_name, L".las") || wcsstr(file_name, L".laz"))
+  {
+    name[wcslen(name) - 1] = 'x';
+  }
+  else if (wcsstr(file_name, L".LAS") || wcsstr(file_name, L".LAZ"))
+  {
+    name[wcslen(name) - 1] = 'X';
+  }
+  else
+  {
+    name[wcslen(name) - 3] = 'l';
+    name[wcslen(name) - 2] = 'a';
+    name[wcslen(name) - 1] = 'x';
+  }
+  FILE* file = _wfopen(name, L"rb");
+  free(name);
+  if (file == 0)
+  {
+    return FALSE;
+  }
+  ByteStreamIn* stream;
+  if (IS_LITTLE_ENDIAN())
+    stream = new ByteStreamInFileLE(file);
+  else
+    stream = new ByteStreamInFileBE(file);
+  if (!read(stream))
+  {
+    fprintf(stderr, "ERROR (LASindex): cannot read '%s'\n", name);
+    delete stream;
+    fclose(file);
+    return FALSE;
+  }
+  delete stream;
+  fclose(file);
+  return TRUE;
+}
+#endif // _WIN32
+
+
 BOOL LASindex::read(const char* file_name)
 {
   if (file_name == 0) return FALSE;

@@ -2234,6 +2234,742 @@ laszip_exploit_spatial_index(
   laszip_dll->error[0] = '\0';
   return 0;
 }
+int common_open_reader(laszip_dll_struct* a_laszip_dll, laszip_BOOL* is_compressed)
+{
+  if (IS_LITTLE_ENDIAN())
+    a_laszip_dll->streamin = new ByteStreamInFileLE(a_laszip_dll->file);
+  else
+    a_laszip_dll->streamin = new ByteStreamInFileBE(a_laszip_dll->file);
+
+  if (a_laszip_dll->streamin == 0)
+  {
+    sprintf(a_laszip_dll->error, "could not alloc ByteStreamInFile");
+    return 1;
+  }
+
+  // read the header variable after variable
+
+  U32 i;
+
+  CHAR file_signature[5];
+  try { a_laszip_dll->streamin->getBytes((U8*)file_signature, 4); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.file_signature");
+    return 1;
+  }
+  if (strncmp(file_signature, "LASF", 4) != 0)
+  {
+    sprintf(a_laszip_dll->error, "wrong file_signature. not a LAS/LAZ file.");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get16bitsLE((U8*)&(a_laszip_dll->header.file_source_ID)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.file_source_ID");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get16bitsLE((U8*)&(a_laszip_dll->header.global_encoding)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.global_encoding");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get32bitsLE((U8*)&(a_laszip_dll->header.project_ID_GUID_data_1)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.project_ID_GUID_data_1");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get16bitsLE((U8*)&(a_laszip_dll->header.project_ID_GUID_data_2)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.project_ID_GUID_data_2");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get16bitsLE((U8*)&(a_laszip_dll->header.project_ID_GUID_data_3)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.project_ID_GUID_data_3");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->getBytes((U8*)a_laszip_dll->header.project_ID_GUID_data_4, 8); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.project_ID_GUID_data_4");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->getBytes((U8*)&(a_laszip_dll->header.version_major), 1); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.version_major");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->getBytes((U8*)&(a_laszip_dll->header.version_minor), 1); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.version_minor");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->getBytes((U8*)a_laszip_dll->header.system_identifier, 32); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.system_identifier");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->getBytes((U8*)a_laszip_dll->header.generating_software, 32); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.generating_software");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get16bitsLE((U8*)&(a_laszip_dll->header.file_creation_day)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.file_creation_day");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get16bitsLE((U8*)&(a_laszip_dll->header.file_creation_year)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.file_creation_year");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get16bitsLE((U8*)&(a_laszip_dll->header.header_size)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.header_size");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get32bitsLE((U8*)&(a_laszip_dll->header.offset_to_point_data)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.offset_to_point_data");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get32bitsLE((U8*)&(a_laszip_dll->header.number_of_variable_length_records)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.number_of_variable_length_records");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->getBytes((U8*)&(a_laszip_dll->header.point_data_format), 1); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.point_data_format");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get16bitsLE((U8*)&(a_laszip_dll->header.point_data_record_length)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.point_data_record_length");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get32bitsLE((U8*)&(a_laszip_dll->header.number_of_point_records)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.number_of_point_records");
+    return 1;
+  }
+  for (i = 0; i < 5; i++)
+  {
+    try { a_laszip_dll->streamin->get32bitsLE((U8*)&(a_laszip_dll->header.number_of_points_by_return[i])); }
+    catch (...)
+    {
+      sprintf(a_laszip_dll->error, "reading header.number_of_points_by_return %d", i);
+      return 1;
+    }
+  }
+  try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.x_scale_factor)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.x_scale_factor");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.y_scale_factor)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.y_scale_factor");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.z_scale_factor)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.z_scale_factor");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.x_offset)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.x_offset");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.y_offset)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.y_offset");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.z_offset)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.z_offset");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.max_x)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.max_x");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.min_x)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.min_x");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.max_y)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.max_y");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.min_y)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.min_y");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.max_z)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.max_z");
+    return 1;
+  }
+  try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.min_z)); }
+  catch (...)
+  {
+    sprintf(a_laszip_dll->error, "reading header.min_z");
+    return 1;
+  }
+
+  // special handling for LAS 1.3
+  if ((a_laszip_dll->header.version_major == 1) && (a_laszip_dll->header.version_minor >= 3))
+  {
+    if (a_laszip_dll->header.header_size < 235)
+    {
+      sprintf(a_laszip_dll->error, "for LAS 1.%d header_size should at least be 235 but it is only %d", a_laszip_dll->header.version_minor, a_laszip_dll->header.header_size);
+      return 1;
+    }
+    else
+    {
+      try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.start_of_waveform_data_packet_record)); }
+      catch (...)
+      {
+        sprintf(a_laszip_dll->error, "reading header.start_of_waveform_data_packet_record");
+        return 1;
+      }
+      a_laszip_dll->header.user_data_in_header_size = a_laszip_dll->header.header_size - 235;
+    }
+  }
+  else
+  {
+    a_laszip_dll->header.user_data_in_header_size = a_laszip_dll->header.header_size - 227;
+  }
+
+  // special handling for LAS 1.4
+  if ((a_laszip_dll->header.version_major == 1) && (a_laszip_dll->header.version_minor >= 4))
+  {
+    if (a_laszip_dll->header.header_size < 375)
+    {
+      sprintf(a_laszip_dll->error, "for LAS 1.%d header_size should at least be 375 but it is only %d", a_laszip_dll->header.version_minor, a_laszip_dll->header.header_size);
+      return 1;
+    }
+    else
+    {
+      try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.start_of_first_extended_variable_length_record)); }
+      catch (...)
+      {
+        sprintf(a_laszip_dll->error, "reading header.start_of_first_extended_variable_length_record");
+        return 1;
+      }
+      try { a_laszip_dll->streamin->get32bitsLE((U8*)&(a_laszip_dll->header.number_of_extended_variable_length_records)); }
+      catch (...)
+      {
+        sprintf(a_laszip_dll->error, "reading header.number_of_extended_variable_length_records");
+        return 1;
+      }
+      try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.extended_number_of_point_records)); }
+      catch (...)
+      {
+        sprintf(a_laszip_dll->error, "reading header.extended_number_of_point_records");
+        return 1;
+      }
+      for (i = 0; i < 15; i++)
+      {
+        try { a_laszip_dll->streamin->get64bitsLE((U8*)&(a_laszip_dll->header.extended_number_of_points_by_return[i])); }
+        catch (...)
+        {
+          sprintf(a_laszip_dll->error, "reading header.extended_number_of_points_by_return[%d]", i);
+          return 1;
+        }
+      }
+      a_laszip_dll->header.user_data_in_header_size = a_laszip_dll->header.header_size - 375;
+    }
+  }
+
+  // load any number of user-defined bytes that might have been added to the header
+  if (a_laszip_dll->header.user_data_in_header_size)
+  {
+    if (a_laszip_dll->header.user_data_in_header)
+    {
+      delete[] a_laszip_dll->header.user_data_in_header;
+    }
+    a_laszip_dll->header.user_data_in_header = new U8[a_laszip_dll->header.user_data_in_header_size];
+
+    try { a_laszip_dll->streamin->getBytes((U8*)a_laszip_dll->header.user_data_in_header, a_laszip_dll->header.user_data_in_header_size); }
+    catch (...)
+    {
+      sprintf(a_laszip_dll->error, "reading %u bytes of data into header.user_data_in_header", a_laszip_dll->header.user_data_in_header_size);
+      return 1;
+    }
+  }
+
+  // read variable length records into the header
+
+  U32 vlrs_size = 0;
+  LASzip* laszip = 0;
+
+  if (a_laszip_dll->header.number_of_variable_length_records)
+  {
+    U32 i;
+
+    a_laszip_dll->header.vlrs = (laszip_vlr*)malloc(sizeof(laszip_vlr)*a_laszip_dll->header.number_of_variable_length_records);
+
+    for (i = 0; i < a_laszip_dll->header.number_of_variable_length_records; i++)
+    {
+      // make sure there are enough bytes left to read a variable length record before the point block starts
+
+      if (((int)a_laszip_dll->header.offset_to_point_data - vlrs_size - a_laszip_dll->header.header_size) < 54)
+      {
+        sprintf(a_laszip_dll->warning, "only %d bytes until point block after reading %d of %d vlrs. skipping remaining vlrs ...", (int)a_laszip_dll->header.offset_to_point_data - vlrs_size - a_laszip_dll->header.header_size, i, a_laszip_dll->header.number_of_variable_length_records);
+        a_laszip_dll->header.number_of_variable_length_records = i;
+        break;
+      }
+
+      // read variable length records variable after variable (to avoid alignment issues)
+
+      try { a_laszip_dll->streamin->get16bitsLE((U8*)&(a_laszip_dll->header.vlrs[i].reserved)); }
+      catch (...)
+      {
+        sprintf(a_laszip_dll->error, "reading header.vlrs[%u].reserved", i);
+        return 1;
+      }
+
+      try { a_laszip_dll->streamin->getBytes((U8*)a_laszip_dll->header.vlrs[i].user_id, 16); }
+      catch (...)
+      {
+        sprintf(a_laszip_dll->error, "reading header.vlrs[%u].user_id", i);
+        return 1;
+      }
+      try { a_laszip_dll->streamin->get16bitsLE((U8*)&(a_laszip_dll->header.vlrs[i].record_id)); }
+      catch (...)
+      {
+        sprintf(a_laszip_dll->error, "reading header.vlrs[%u].record_id", i);
+        return 1;
+      }
+      try { a_laszip_dll->streamin->get16bitsLE((U8*)&(a_laszip_dll->header.vlrs[i].record_length_after_header)); }
+      catch (...)
+      {
+        sprintf(a_laszip_dll->error, "reading header.vlrs[%u].record_length_after_header", i);
+        return 1;
+      }
+      try { a_laszip_dll->streamin->getBytes((U8*)a_laszip_dll->header.vlrs[i].description, 32); }
+      catch (...)
+      {
+        sprintf(a_laszip_dll->error, "reading header.vlrs[%u].description", i);
+        return 1;
+      }
+
+      // keep track on the number of bytes we have read so far
+
+      vlrs_size += 54;
+
+      // check variable length record contents
+
+      if (a_laszip_dll->header.vlrs[i].reserved != 0xAABB)
+      {
+        sprintf(a_laszip_dll->warning, "wrong header.vlrs[%d].reserved: %d != 0xAABB", i, a_laszip_dll->header.vlrs[i].reserved);
+      }
+
+      // make sure there are enough bytes left to read the data of the variable length record before the point block starts
+
+      if (((int)a_laszip_dll->header.offset_to_point_data - vlrs_size - a_laszip_dll->header.header_size) < a_laszip_dll->header.vlrs[i].record_length_after_header)
+      {
+        sprintf(a_laszip_dll->warning, "only %d bytes until point block when trying to read %d bytes into header.vlrs[%d].data", (int)a_laszip_dll->header.offset_to_point_data - vlrs_size - a_laszip_dll->header.header_size, a_laszip_dll->header.vlrs[i].record_length_after_header, i);
+        a_laszip_dll->header.vlrs[i].record_length_after_header = (int)a_laszip_dll->header.offset_to_point_data - vlrs_size - a_laszip_dll->header.header_size;
+      }
+
+      // load data following the header of the variable length record
+
+      if (a_laszip_dll->header.vlrs[i].record_length_after_header)
+      {
+        if (strcmp(a_laszip_dll->header.vlrs[i].user_id, "laszip encoded") == 0)
+        {
+          if (laszip)
+          {
+            delete laszip;
+          }
+
+          laszip = new LASzip();
+
+          if (laszip == 0)
+          {
+            sprintf(a_laszip_dll->error, "could not alloc LASzip");
+            return 1;
+          }
+
+          // read the LASzip VLR payload
+
+          //     U16  compressor                2 bytes 
+          //     U32  coder                     2 bytes 
+          //     U8   version_major             1 byte 
+          //     U8   version_minor             1 byte
+          //     U16  version_revision          2 bytes
+          //     U32  options                   4 bytes 
+          //     I32  chunk_size                4 bytes
+          //     I64  number_of_special_evlrs   8 bytes
+          //     I64  offset_to_special_evlrs   8 bytes
+          //     U16  num_items                 2 bytes
+          //        U16 type                2 bytes * num_items
+          //        U16 size                2 bytes * num_items
+          //        U16 version             2 bytes * num_items
+          // which totals 34+6*num_items
+
+          try { a_laszip_dll->streamin->get16bitsLE((U8*)&(laszip->compressor)); }
+          catch (...)
+          {
+            sprintf(a_laszip_dll->error, "reading compressor %d", (I32)laszip->compressor);
+            return 1;
+          }
+          try { a_laszip_dll->streamin->get16bitsLE((U8*)&(laszip->coder)); }
+          catch (...)
+          {
+            sprintf(a_laszip_dll->error, "reading coder %d", (I32)laszip->coder);
+            return 1;
+          }
+          try { a_laszip_dll->streamin->getBytes((U8*)&(laszip->version_major), 1); }
+          catch (...)
+          {
+            sprintf(a_laszip_dll->error, "reading version_major %d", (I32)laszip->version_major);
+            return 1;
+          }
+          try { a_laszip_dll->streamin->getBytes((U8*)&(laszip->version_minor), 1); }
+          catch (...)
+          {
+            sprintf(a_laszip_dll->error, "reading version_minor %d", (I32)laszip->version_minor);
+            return 1;
+          }
+          try { a_laszip_dll->streamin->get16bitsLE((U8*)&(laszip->version_revision)); }
+          catch (...)
+          {
+            sprintf(a_laszip_dll->error, "reading version_revision %d", (I32)laszip->version_revision);
+            return 1;
+          }
+          try { a_laszip_dll->streamin->get32bitsLE((U8*)&(laszip->options)); }
+          catch (...)
+          {
+            sprintf(a_laszip_dll->error, "reading options %u", laszip->options);
+            return 1;
+          }
+          try { a_laszip_dll->streamin->get32bitsLE((U8*)&(laszip->chunk_size)); }
+          catch (...)
+          {
+            sprintf(a_laszip_dll->error, "reading chunk_size %u", laszip->chunk_size);
+            return 1;
+          }
+          try { a_laszip_dll->streamin->get64bitsLE((U8*)&(laszip->number_of_special_evlrs)); }
+          catch (...)
+          {
+            sprintf(a_laszip_dll->error, "reading number_of_special_evlrs %d", (I32)laszip->number_of_special_evlrs);
+            return 1;
+          }
+          try { a_laszip_dll->streamin->get64bitsLE((U8*)&(laszip->offset_to_special_evlrs)); }
+          catch (...)
+          {
+            sprintf(a_laszip_dll->error, "reading offset_to_special_evlrs %d", (I32)laszip->offset_to_special_evlrs);
+            return 1;
+          }
+          try { a_laszip_dll->streamin->get16bitsLE((U8*)&(laszip->num_items)); }
+          catch (...)
+          {
+            sprintf(a_laszip_dll->error, "reading num_items %d", (I32)laszip->num_items);
+            return 1;
+          }
+          laszip->items = new LASitem[laszip->num_items];
+          U32 j;
+          for (j = 0; j < laszip->num_items; j++)
+          {
+            U16 type;
+            try { a_laszip_dll->streamin->get16bitsLE((U8*)&type); }
+            catch (...)
+            {
+              sprintf(a_laszip_dll->error, "reading type of item %u", j);
+              return 1;
+            }
+            laszip->items[j].type = (LASitem::Type)type;
+            try { a_laszip_dll->streamin->get16bitsLE((U8*)&(laszip->items[j].size)); }
+            catch (...)
+            {
+              sprintf(a_laszip_dll->error, "reading size of item %u", j);
+              return 1;
+            }
+            try { a_laszip_dll->streamin->get16bitsLE((U8*)&(laszip->items[j].version)); }
+            catch (...)
+            {
+              sprintf(a_laszip_dll->error, "reading version of item %u", j);
+              return 1;
+            }
+          }
+        }
+        else
+        {
+          a_laszip_dll->header.vlrs[i].data = new U8[a_laszip_dll->header.vlrs[i].record_length_after_header];
+
+          try { a_laszip_dll->streamin->getBytes(a_laszip_dll->header.vlrs[i].data, a_laszip_dll->header.vlrs[i].record_length_after_header); }
+          catch (...)
+          {
+            sprintf(a_laszip_dll->error, "reading %d bytes of data into header.vlrs[%u].data", (I32)a_laszip_dll->header.vlrs[i].record_length_after_header, i);
+            return 1;
+          }
+        }
+      }
+      else
+      {
+        a_laszip_dll->header.vlrs[i].data = 0;
+      }
+
+      // keep track on the number of bytes we have read so far
+
+      vlrs_size += a_laszip_dll->header.vlrs[i].record_length_after_header;
+
+      // special handling for LASzip VLR
+
+      if (strcmp(a_laszip_dll->header.vlrs[i].user_id, "laszip encoded") == 0)
+      {
+        // we take our the VLR for LASzip away
+        a_laszip_dll->header.offset_to_point_data -= (54 + a_laszip_dll->header.vlrs[i].record_length_after_header);
+        vlrs_size -= (54 + a_laszip_dll->header.vlrs[i].record_length_after_header);
+        i--;
+        a_laszip_dll->header.number_of_variable_length_records--;
+      }
+    }
+  }
+
+  // load any number of user-defined bytes that might have been added after the header
+
+  a_laszip_dll->header.user_data_after_header_size = (I32)a_laszip_dll->header.offset_to_point_data - vlrs_size - a_laszip_dll->header.header_size;
+  if (a_laszip_dll->header.user_data_after_header_size)
+  {
+    if (a_laszip_dll->header.user_data_after_header)
+    {
+      delete[] a_laszip_dll->header.user_data_after_header;
+    }
+    a_laszip_dll->header.user_data_after_header = new U8[a_laszip_dll->header.user_data_after_header_size];
+
+    try { a_laszip_dll->streamin->getBytes((U8*)a_laszip_dll->header.user_data_after_header, a_laszip_dll->header.user_data_after_header_size); }
+    catch (...)
+    {
+      sprintf(a_laszip_dll->error, "reading %u bytes of data into header.user_data_after_header", a_laszip_dll->header.user_data_after_header_size);
+      return 1;
+    }
+  }
+
+  // remove extra bits in point data type
+
+  if ((a_laszip_dll->header.point_data_format & 128) || (a_laszip_dll->header.point_data_format & 64))
+  {
+    if (!laszip)
+    {
+      sprintf(a_laszip_dll->error, "this file was compressed with an experimental version of LASzip. contact 'martin.isenburg@rapidlasso.com' for assistance");
+      return 1;
+    }
+    a_laszip_dll->header.point_data_format &= 127;
+  }
+
+  // check if file is compressed
+
+  if (laszip)
+  {
+    // yes. check the compressor state
+    *is_compressed = 1;
+    if (!laszip->check())
+    {
+      sprintf(a_laszip_dll->error, "%s upgrade to the latest release of LAStools (with LASzip) or contact 'martin.isenburg@rapidlasso.com' for assistance", laszip->get_error());
+      return 1;
+    }
+  }
+  else
+  {
+    // no. setup an un-compressed read
+    *is_compressed = 0;
+    laszip = new LASzip;
+    if (laszip == 0)
+    {
+      sprintf(a_laszip_dll->error, "could not alloc LASzip");
+      return 1;
+    }
+    if (!laszip->setup(a_laszip_dll->header.point_data_format, a_laszip_dll->header.point_data_record_length, LASZIP_COMPRESSOR_NONE))
+    {
+      sprintf(a_laszip_dll->error, "invalid combination of point_data_format %d and point_data_record_length %d", (I32)a_laszip_dll->header.point_data_format, (I32)a_laszip_dll->header.point_data_record_length);
+      return 1;
+    }
+  }
+
+  // create point's item pointers
+
+  a_laszip_dll->point_items = new U8*[laszip->num_items];
+
+  if (a_laszip_dll->point_items == 0)
+  {
+    sprintf(a_laszip_dll->error, "could not alloc point_items");
+    return 1;
+  }
+
+  for (i = 0; i < laszip->num_items; i++)
+  {
+    switch (laszip->items[i].type)
+    {
+    case LASitem::POINT14:
+    case LASitem::POINT10:
+      a_laszip_dll->point_items[i] = (U8*)&(a_laszip_dll->point.X);
+      break;
+    case LASitem::GPSTIME11:
+      a_laszip_dll->point_items[i] = (U8*)&(a_laszip_dll->point.gps_time);
+      break;
+    case LASitem::RGBNIR14:
+    case LASitem::RGB12:
+      a_laszip_dll->point_items[i] = (U8*)a_laszip_dll->point.rgb;
+      break;
+    case LASitem::WAVEPACKET13:
+      a_laszip_dll->point_items[i] = (U8*)&(a_laszip_dll->point.wave_packet);
+      break;
+    case LASitem::BYTE:
+      a_laszip_dll->point.num_extra_bytes = laszip->items[i].size;
+      if (a_laszip_dll->point.extra_bytes) delete[] a_laszip_dll->point.extra_bytes;
+      a_laszip_dll->point.extra_bytes = new U8[a_laszip_dll->point.num_extra_bytes];
+      a_laszip_dll->point_items[i] = a_laszip_dll->point.extra_bytes;
+      break;
+    default:
+      sprintf(a_laszip_dll->error, "unknown LASitem type %d", (I32)laszip->items[i].type);
+      return 1;
+    }
+  }
+
+  // create the point reader
+
+  a_laszip_dll->reader = new LASreadPoint();
+  if (a_laszip_dll->reader == 0)
+  {
+    sprintf(a_laszip_dll->error, "could not alloc LASreadPoint");
+    return 1;
+  }
+
+  if (!a_laszip_dll->reader->setup(laszip->num_items, laszip->items, laszip))
+  {
+    sprintf(a_laszip_dll->error, "setup of LASreadPoint failed");
+    return 1;
+  }
+
+  if (!a_laszip_dll->reader->init(a_laszip_dll->streamin))
+  {
+    sprintf(a_laszip_dll->error, "init of LASreadPoint failed");
+    return 1;
+  }
+
+  delete laszip;
+  return 0;
+}
+#ifdef _WIN32
+/*---------------------------------------------------------------------------*/
+LASZIP_API laszip_I32
+laszip_wopen_reader(
+laszip_POINTER                     pointer
+, const laszip_WCHAR*              file_name
+, laszip_BOOL*                     is_compressed
+)
+{
+  if (pointer == 0) return 1;
+  laszip_dll_struct* laszip_dll = (laszip_dll_struct*)pointer;
+
+  try
+  {
+    if (file_name == 0)
+    {
+      sprintf(laszip_dll->error, "file_name pointer is zero");
+      return 1;
+    }
+
+    if (is_compressed == 0)
+    {
+      sprintf(laszip_dll->error, "is_compressed pointer is zero");
+      return 1;
+    }
+
+    if (laszip_dll->writer)
+    {
+      sprintf(laszip_dll->error, "writer is already open");
+      return 1;
+    }
+
+    if (laszip_dll->reader)
+    {
+      sprintf(laszip_dll->error, "reader is already open");
+      return 1;
+    }
+
+    // open the file
+
+    laszip_dll->file = _wfopen(file_name, L"rb");
+
+    if (laszip_dll->file == 0)
+    {
+      sprintf(laszip_dll->error, "cannot open file '%s'", file_name);
+      return 1;
+    }
+    if(common_open_reader(laszip_dll, is_compressed) == 1)
+    {
+      return 1;
+    }
+
+    // should we try to exploit existing spatial indexing information
+
+    if (laszip_dll->lax_exploit)
+    {
+      laszip_dll->lax_index = new LASindex();
+
+      if (!laszip_dll->lax_index->read(file_name))
+      {
+        delete laszip_dll->lax_index;
+        laszip_dll->lax_index = 0;
+      }
+    }
+
+    // set the point number and point count
+
+    laszip_dll->npoints = laszip_dll->header.number_of_point_records;
+    laszip_dll->p_count = 0;
+  }
+  catch (...)
+  {
+    sprintf(laszip_dll->error, "internal error in laszip_open_reader");
+    return 1;
+  }
+
+  laszip_dll->error[0] = '\0';
+  return 0;
+}
+#endif //_WIN32
 
 /*---------------------------------------------------------------------------*/
 LASZIP_API laszip_I32
@@ -2282,596 +3018,8 @@ laszip_open_reader(
       return 1;
     }
 
-    if (IS_LITTLE_ENDIAN())
-      laszip_dll->streamin = new ByteStreamInFileLE(laszip_dll->file);
-    else
-      laszip_dll->streamin = new ByteStreamInFileBE(laszip_dll->file);
-
-    if (laszip_dll->streamin == 0)
+    if (common_open_reader(laszip_dll, is_compressed) == 1)
     {
-      sprintf(laszip_dll->error, "could not alloc ByteStreamInFile");
-      return 1;
-    }
-
-    // read the header variable after variable
-
-    U32 i;
-
-    CHAR file_signature[5];
-    try { laszip_dll->streamin->getBytes((U8*)file_signature, 4); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.file_signature");
-      return 1;
-    }
-    if (strncmp(file_signature, "LASF", 4) != 0)
-    {
-      sprintf(laszip_dll->error, "wrong file_signature. not a LAS/LAZ file.");
-      return 1;
-    }
-    try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip_dll->header.file_source_ID)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.file_source_ID");
-      return 1;
-    }
-    try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip_dll->header.global_encoding)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.global_encoding");
-      return 1;
-    }
-    try { laszip_dll->streamin->get32bitsLE((U8*)&(laszip_dll->header.project_ID_GUID_data_1)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.project_ID_GUID_data_1");
-      return 1;
-    }
-    try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip_dll->header.project_ID_GUID_data_2)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.project_ID_GUID_data_2");
-      return 1;
-    }
-    try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip_dll->header.project_ID_GUID_data_3)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.project_ID_GUID_data_3");
-      return 1;
-    }
-    try { laszip_dll->streamin->getBytes((U8*)laszip_dll->header.project_ID_GUID_data_4, 8); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.project_ID_GUID_data_4");
-      return 1;
-    }
-    try { laszip_dll->streamin->getBytes((U8*)&(laszip_dll->header.version_major), 1); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.version_major");
-      return 1;
-    }
-    try { laszip_dll->streamin->getBytes((U8*)&(laszip_dll->header.version_minor), 1); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.version_minor");
-      return 1;
-    }
-    try { laszip_dll->streamin->getBytes((U8*)laszip_dll->header.system_identifier, 32); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.system_identifier");
-      return 1;
-    }
-    try { laszip_dll->streamin->getBytes((U8*)laszip_dll->header.generating_software, 32); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.generating_software");
-      return 1;
-    }
-    try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip_dll->header.file_creation_day)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.file_creation_day");
-      return 1;
-    }
-    try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip_dll->header.file_creation_year)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.file_creation_year");
-      return 1;
-    }
-    try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip_dll->header.header_size)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.header_size");
-      return 1;
-    }
-    try { laszip_dll->streamin->get32bitsLE((U8*)&(laszip_dll->header.offset_to_point_data)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.offset_to_point_data");
-      return 1;
-    }
-    try { laszip_dll->streamin->get32bitsLE((U8*)&(laszip_dll->header.number_of_variable_length_records)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.number_of_variable_length_records");
-      return 1;
-    }
-    try { laszip_dll->streamin->getBytes((U8*)&(laszip_dll->header.point_data_format), 1); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.point_data_format");
-      return 1;
-    }
-    try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip_dll->header.point_data_record_length)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.point_data_record_length");
-      return 1;
-    }
-    try { laszip_dll->streamin->get32bitsLE((U8*)&(laszip_dll->header.number_of_point_records)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.number_of_point_records");
-      return 1;
-    }
-    for (i = 0; i < 5; i++)
-    {
-      try { laszip_dll->streamin->get32bitsLE((U8*)&(laszip_dll->header.number_of_points_by_return[i])); } catch(...)
-      {
-        sprintf(laszip_dll->error, "reading header.number_of_points_by_return %d", i);
-        return 1;
-      }
-    }
-    try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.x_scale_factor)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.x_scale_factor");
-      return 1;
-    }
-    try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.y_scale_factor)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.y_scale_factor");
-      return 1;
-    }
-    try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.z_scale_factor)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.z_scale_factor");
-      return 1;
-    }
-    try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.x_offset)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.x_offset");
-      return 1;
-    }
-    try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.y_offset)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.y_offset");
-      return 1;
-    }
-    try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.z_offset)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.z_offset");
-      return 1;
-    }
-    try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.max_x)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.max_x");
-      return 1;
-    }
-    try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.min_x)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.min_x");
-      return 1;
-    }
-    try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.max_y)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.max_y");
-      return 1;
-    }
-    try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.min_y)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.min_y");
-      return 1;
-    }
-    try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.max_z)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.max_z");
-      return 1;
-    }
-    try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.min_z)); } catch(...)
-    {
-      sprintf(laszip_dll->error, "reading header.min_z");
-      return 1;
-    }
-
-    // special handling for LAS 1.3
-    if ((laszip_dll->header.version_major == 1) && (laszip_dll->header.version_minor >= 3))
-    {
-      if (laszip_dll->header.header_size < 235)
-      {
-        sprintf(laszip_dll->error, "for LAS 1.%d header_size should at least be 235 but it is only %d", laszip_dll->header.version_minor, laszip_dll->header.header_size);
-        return 1;
-      }
-      else
-      {
-        try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.start_of_waveform_data_packet_record)); } catch(...)
-        {
-          sprintf(laszip_dll->error, "reading header.start_of_waveform_data_packet_record");
-          return 1;
-        }
-        laszip_dll->header.user_data_in_header_size = laszip_dll->header.header_size - 235;
-      }
-    }
-    else
-    {
-      laszip_dll->header.user_data_in_header_size = laszip_dll->header.header_size - 227;
-    }
-
-    // special handling for LAS 1.4
-    if ((laszip_dll->header.version_major == 1) && (laszip_dll->header.version_minor >= 4))
-    {
-      if (laszip_dll->header.header_size < 375)
-      {
-        sprintf(laszip_dll->error, "for LAS 1.%d header_size should at least be 375 but it is only %d", laszip_dll->header.version_minor, laszip_dll->header.header_size);
-        return 1;
-      }
-      else
-      {
-        try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.start_of_first_extended_variable_length_record)); } catch(...)
-        {
-          sprintf(laszip_dll->error, "reading header.start_of_first_extended_variable_length_record");
-          return 1;
-        }
-        try { laszip_dll->streamin->get32bitsLE((U8*)&(laszip_dll->header.number_of_extended_variable_length_records)); } catch(...)
-        {
-          sprintf(laszip_dll->error, "reading header.number_of_extended_variable_length_records");
-          return 1;
-        }
-        try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.extended_number_of_point_records)); } catch(...)
-        {
-          sprintf(laszip_dll->error, "reading header.extended_number_of_point_records");
-          return 1;
-        }
-        for (i = 0; i < 15; i++)
-        {
-          try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip_dll->header.extended_number_of_points_by_return[i])); } catch(...)
-          {
-            sprintf(laszip_dll->error, "reading header.extended_number_of_points_by_return[%d]", i);
-            return 1;
-          }
-        }
-        laszip_dll->header.user_data_in_header_size = laszip_dll->header.header_size - 375;
-      }
-    }
-
-    // load any number of user-defined bytes that might have been added to the header
-    if (laszip_dll->header.user_data_in_header_size)
-    {
-      if (laszip_dll->header.user_data_in_header)
-      {
-        delete [] laszip_dll->header.user_data_in_header;
-      }
-      laszip_dll->header.user_data_in_header = new U8[laszip_dll->header.user_data_in_header_size];
-
-      try { laszip_dll->streamin->getBytes((U8*)laszip_dll->header.user_data_in_header, laszip_dll->header.user_data_in_header_size); } catch(...)
-      {
-        sprintf(laszip_dll->error, "reading %u bytes of data into header.user_data_in_header", laszip_dll->header.user_data_in_header_size);
-        return 1;
-      }
-    }
-
-    // read variable length records into the header
-
-    U32 vlrs_size = 0;
-    LASzip* laszip = 0;
-
-    if (laszip_dll->header.number_of_variable_length_records)
-    {
-      U32 i;
-
-      laszip_dll->header.vlrs = (laszip_vlr*)malloc(sizeof(laszip_vlr)*laszip_dll->header.number_of_variable_length_records);
- 
-      for (i = 0; i < laszip_dll->header.number_of_variable_length_records; i++)
-      {
-        // make sure there are enough bytes left to read a variable length record before the point block starts
-
-        if (((int)laszip_dll->header.offset_to_point_data - vlrs_size - laszip_dll->header.header_size) < 54)
-        {
-          sprintf(laszip_dll->warning, "only %d bytes until point block after reading %d of %d vlrs. skipping remaining vlrs ...", (int)laszip_dll->header.offset_to_point_data - vlrs_size - laszip_dll->header.header_size, i, laszip_dll->header.number_of_variable_length_records);
-          laszip_dll->header.number_of_variable_length_records = i;
-          break;
-        }
-
-        // read variable length records variable after variable (to avoid alignment issues)
-
-        try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip_dll->header.vlrs[i].reserved)); } catch(...)
-        {
-          sprintf(laszip_dll->error, "reading header.vlrs[%u].reserved", i);
-          return 1;
-        }
-
-        try { laszip_dll->streamin->getBytes((U8*)laszip_dll->header.vlrs[i].user_id, 16); } catch(...)
-        {
-          sprintf(laszip_dll->error, "reading header.vlrs[%u].user_id", i);
-          return 1;
-        }
-        try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip_dll->header.vlrs[i].record_id)); } catch(...)
-        {
-          sprintf(laszip_dll->error, "reading header.vlrs[%u].record_id", i);
-          return 1;
-        }
-        try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip_dll->header.vlrs[i].record_length_after_header)); } catch(...)
-        {
-          sprintf(laszip_dll->error, "reading header.vlrs[%u].record_length_after_header", i);
-          return 1;
-        }
-        try { laszip_dll->streamin->getBytes((U8*)laszip_dll->header.vlrs[i].description, 32); } catch(...)
-        {
-          sprintf(laszip_dll->error, "reading header.vlrs[%u].description", i);
-          return 1;
-        }
-
-        // keep track on the number of bytes we have read so far
-
-        vlrs_size += 54;
-
-        // check variable length record contents
-
-        if (laszip_dll->header.vlrs[i].reserved != 0xAABB)
-        {
-          sprintf(laszip_dll->warning,"wrong header.vlrs[%d].reserved: %d != 0xAABB", i, laszip_dll->header.vlrs[i].reserved);
-        }
-
-        // make sure there are enough bytes left to read the data of the variable length record before the point block starts
-
-        if (((int)laszip_dll->header.offset_to_point_data - vlrs_size - laszip_dll->header.header_size) < laszip_dll->header.vlrs[i].record_length_after_header)
-        {
-          sprintf(laszip_dll->warning, "only %d bytes until point block when trying to read %d bytes into header.vlrs[%d].data", (int)laszip_dll->header.offset_to_point_data - vlrs_size - laszip_dll->header.header_size, laszip_dll->header.vlrs[i].record_length_after_header, i);
-          laszip_dll->header.vlrs[i].record_length_after_header = (int)laszip_dll->header.offset_to_point_data - vlrs_size - laszip_dll->header.header_size;
-        }
-
-        // load data following the header of the variable length record
-
-        if (laszip_dll->header.vlrs[i].record_length_after_header)
-        {
-          if (strcmp(laszip_dll->header.vlrs[i].user_id, "laszip encoded") == 0)
-          {
-            if (laszip)
-            {
-              delete laszip;
-            }
-
-            laszip = new LASzip();
-
-            if (laszip == 0)
-            {
-              sprintf(laszip_dll->error, "could not alloc LASzip");
-              return 1;
-            }
-
-            // read the LASzip VLR payload
-
-            //     U16  compressor                2 bytes 
-            //     U32  coder                     2 bytes 
-            //     U8   version_major             1 byte 
-            //     U8   version_minor             1 byte
-            //     U16  version_revision          2 bytes
-            //     U32  options                   4 bytes 
-            //     I32  chunk_size                4 bytes
-            //     I64  number_of_special_evlrs   8 bytes
-            //     I64  offset_to_special_evlrs   8 bytes
-            //     U16  num_items                 2 bytes
-            //        U16 type                2 bytes * num_items
-            //        U16 size                2 bytes * num_items
-            //        U16 version             2 bytes * num_items
-            // which totals 34+6*num_items
-
-            try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip->compressor)); } catch(...)
-            {
-              sprintf(laszip_dll->error, "reading compressor %d", (I32)laszip->compressor);
-              return 1;
-            }
-            try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip->coder)); } catch(...)
-            {
-              sprintf(laszip_dll->error, "reading coder %d", (I32)laszip->coder);
-              return 1;
-            }
-            try { laszip_dll->streamin->getBytes((U8*)&(laszip->version_major), 1); } catch(...)
-            {
-              sprintf(laszip_dll->error, "reading version_major %d", (I32)laszip->version_major);
-              return 1;
-            }
-            try { laszip_dll->streamin->getBytes((U8*)&(laszip->version_minor), 1); } catch(...)
-            {
-              sprintf(laszip_dll->error, "reading version_minor %d", (I32)laszip->version_minor);
-              return 1;
-            }
-            try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip->version_revision)); } catch(...)
-            {
-              sprintf(laszip_dll->error, "reading version_revision %d", (I32)laszip->version_revision);
-              return 1;
-            }
-            try { laszip_dll->streamin->get32bitsLE((U8*)&(laszip->options)); } catch(...)
-            {
-              sprintf(laszip_dll->error, "reading options %u", laszip->options);
-              return 1;
-            }
-            try { laszip_dll->streamin->get32bitsLE((U8*)&(laszip->chunk_size)); } catch(...)
-            {
-              sprintf(laszip_dll->error, "reading chunk_size %u", laszip->chunk_size);
-              return 1;
-            }
-            try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip->number_of_special_evlrs)); } catch(...)
-            {
-              sprintf(laszip_dll->error, "reading number_of_special_evlrs %d", (I32)laszip->number_of_special_evlrs);
-              return 1;
-            }
-            try { laszip_dll->streamin->get64bitsLE((U8*)&(laszip->offset_to_special_evlrs)); } catch(...)
-            {
-              sprintf(laszip_dll->error, "reading offset_to_special_evlrs %d", (I32)laszip->offset_to_special_evlrs);
-              return 1;
-            }
-            try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip->num_items)); } catch(...)
-            {
-              sprintf(laszip_dll->error, "reading num_items %d", (I32)laszip->num_items);
-              return 1;
-            }
-            laszip->items = new LASitem[laszip->num_items];
-            U32 j;
-            for (j = 0; j < laszip->num_items; j++)
-            {
-              U16 type;
-              try { laszip_dll->streamin->get16bitsLE((U8*)&type); } catch(...)
-              {
-                sprintf(laszip_dll->error, "reading type of item %u", j);
-                return 1;
-              }
-              laszip->items[j].type = (LASitem::Type)type;
-              try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip->items[j].size)); } catch(...)
-              {
-                sprintf(laszip_dll->error, "reading size of item %u", j);
-                return 1;
-              }
-              try { laszip_dll->streamin->get16bitsLE((U8*)&(laszip->items[j].version)); } catch(...)
-              {
-                sprintf(laszip_dll->error, "reading version of item %u", j);
-                return 1;
-              }
-            }
-          }
-          else
-          {
-            laszip_dll->header.vlrs[i].data = new U8[laszip_dll->header.vlrs[i].record_length_after_header];
-
-            try { laszip_dll->streamin->getBytes(laszip_dll->header.vlrs[i].data, laszip_dll->header.vlrs[i].record_length_after_header); } catch(...)
-            {
-              sprintf(laszip_dll->error, "reading %d bytes of data into header.vlrs[%u].data", (I32)laszip_dll->header.vlrs[i].record_length_after_header, i);
-              return 1;
-            }
-          }
-        }
-        else
-        {
-          laszip_dll->header.vlrs[i].data = 0;
-        }
-
-        // keep track on the number of bytes we have read so far
-
-        vlrs_size += laszip_dll->header.vlrs[i].record_length_after_header;
-
-        // special handling for LASzip VLR
-
-        if (strcmp(laszip_dll->header.vlrs[i].user_id, "laszip encoded") == 0)
-        {
-          // we take our the VLR for LASzip away
-          laszip_dll->header.offset_to_point_data -= (54+laszip_dll->header.vlrs[i].record_length_after_header);
-          vlrs_size -= (54+laszip_dll->header.vlrs[i].record_length_after_header);
-          i--;
-          laszip_dll->header.number_of_variable_length_records--;
-        }
-      }
-    }
-
-    // load any number of user-defined bytes that might have been added after the header
-
-    laszip_dll->header.user_data_after_header_size = (I32)laszip_dll->header.offset_to_point_data - vlrs_size - laszip_dll->header.header_size;
-    if (laszip_dll->header.user_data_after_header_size)
-    {
-      if (laszip_dll->header.user_data_after_header)
-      {
-        delete [] laszip_dll->header.user_data_after_header;
-      }
-      laszip_dll->header.user_data_after_header = new U8[laszip_dll->header.user_data_after_header_size];
-
-      try { laszip_dll->streamin->getBytes((U8*)laszip_dll->header.user_data_after_header, laszip_dll->header.user_data_after_header_size); } catch(...)
-      {
-        sprintf(laszip_dll->error, "reading %u bytes of data into header.user_data_after_header", laszip_dll->header.user_data_after_header_size);
-        return 1;
-      }
-    }
-
-    // remove extra bits in point data type
-
-    if ((laszip_dll->header.point_data_format & 128) || (laszip_dll->header.point_data_format & 64)) 
-    {
-      if (!laszip)
-      {
-        sprintf(laszip_dll->error, "this file was compressed with an experimental version of LASzip. contact 'martin.isenburg@rapidlasso.com' for assistance");
-        return 1;
-      }
-      laszip_dll->header.point_data_format &= 127;
-    }
-
-    // check if file is compressed
-
-    if (laszip)
-    {
-      // yes. check the compressor state
-      *is_compressed = 1;
-      if (!laszip->check())
-      {
-        sprintf(laszip_dll->error, "%s upgrade to the latest release of LAStools (with LASzip) or contact 'martin.isenburg@rapidlasso.com' for assistance", laszip->get_error());
-        return 1;
-      }      
-    }
-    else
-    {
-      // no. setup an un-compressed read
-      *is_compressed = 0;
-      laszip = new LASzip;
-      if (laszip == 0)
-      {
-        sprintf(laszip_dll->error, "could not alloc LASzip");
-        return 1;
-      }
-      if (!laszip->setup(laszip_dll->header.point_data_format, laszip_dll->header.point_data_record_length, LASZIP_COMPRESSOR_NONE))
-      {
-        sprintf(laszip_dll->error, "invalid combination of point_data_format %d and point_data_record_length %d", (I32)laszip_dll->header.point_data_format, (I32)laszip_dll->header.point_data_record_length);
-        return 1;
-      }
-    }
-
-    // create point's item pointers
-
-    laszip_dll->point_items = new U8*[laszip->num_items];
-
-    if (laszip_dll->point_items == 0)
-    {
-      sprintf(laszip_dll->error, "could not alloc point_items");
-      return 1;
-    }
-
-    for (i = 0; i < laszip->num_items; i++)
-    {
-      switch (laszip->items[i].type)
-      {
-      case LASitem::POINT14:
-      case LASitem::POINT10:
-        laszip_dll->point_items[i] = (U8*)&(laszip_dll->point.X);
-        break;
-      case LASitem::GPSTIME11:
-        laszip_dll->point_items[i] = (U8*)&(laszip_dll->point.gps_time);
-        break;
-      case LASitem::RGBNIR14:
-      case LASitem::RGB12:
-        laszip_dll->point_items[i] = (U8*)laszip_dll->point.rgb;
-        break;
-      case LASitem::WAVEPACKET13:
-        laszip_dll->point_items[i] = (U8*)&(laszip_dll->point.wave_packet);
-        break;
-      case LASitem::BYTE:
-        laszip_dll->point.num_extra_bytes = laszip->items[i].size;
-        if (laszip_dll->point.extra_bytes) delete [] laszip_dll->point.extra_bytes;
-        laszip_dll->point.extra_bytes = new U8[laszip_dll->point.num_extra_bytes];
-        laszip_dll->point_items[i] = laszip_dll->point.extra_bytes;
-        break;
-      default:
-        sprintf(laszip_dll->error, "unknown LASitem type %d", (I32)laszip->items[i].type);
-        return 1;
-      }
-    }
-
-    // create the point reader
-
-    laszip_dll->reader = new LASreadPoint();
-    if (laszip_dll->reader == 0)
-    {
-      sprintf(laszip_dll->error, "could not alloc LASreadPoint");
-      return 1;
-    }
-
-    if (!laszip_dll->reader->setup(laszip->num_items, laszip->items, laszip))
-    {
-      sprintf(laszip_dll->error, "setup of LASreadPoint failed");
-      return 1;
-    }
-
-    if (!laszip_dll->reader->init(laszip_dll->streamin))
-    {
-      sprintf(laszip_dll->error, "init of LASreadPoint failed");
       return 1;
     }
 
@@ -2887,8 +3035,6 @@ laszip_open_reader(
         laszip_dll->lax_index = 0;
       }
     }
-
-    delete laszip;
 
     // set the point number and point count
 

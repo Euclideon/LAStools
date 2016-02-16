@@ -67,6 +67,11 @@ public:
   BOOL read(ByteStreamIn* stream);
   BOOL write(ByteStreamOut* stream) const;
 
+#ifdef _WIN32
+  BOOL read(const wchar_t* file_name);
+#endif // _WIN32
+
+
   // intersect
   BOOL intersect_rectangle(const F64 r_min_x, const F64 r_min_y, const F64 r_max_x, const F64 r_max_y);
   BOOL intersect_tile(const F32 ll_x, const F32 ll_y, const F32 size);
